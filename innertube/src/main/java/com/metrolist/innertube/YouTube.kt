@@ -363,21 +363,35 @@ object YouTube {
     }
 
     suspend fun playlistContinuation(continuation: String) = runCatching {
-        val response = innerTube.browse(
-            client = WEB_REMIX,
-            continuation = continuation,
-            setLogin = true
-        ).body<BrowseResponse>()
+    val response = innerTube.browse(
+        client = WEB_REMIX,
+        continuation = continuation,
+        setLogin = true
+    ).body<BrowseResponse>()
 
-        val musicPlaylistShelfContinuation = response.continuationContents?.musicPlaylistShelfContinuation
-        if (musicPlaylistShelfContinuation != null) {
+    when {
+        // Handle playlist continuation
+        response.continuationContents?.musicPlaylistShelfContinuation != null -> {
+            val shelf = response.continuationContents.musicPlaylistShelfContinuation
             PlaylistContinuationPage(
-                songs = musicPlaylistShelfContinuation.contents.getItems().mapNotNull {
+                songs = shelf.contents.getItems().mapNotNull {
                     PlaylistPage.fromMusicResponsiveListItemRenderer(it)
                 },
-                continuation = musicPlaylistShelfContinuation.continuations?.getContinuation()
+                continuation = shelf.continuations?.getContinuation()
             )
-        } else {
+        }
+        // Handle radio continuation
+        response.continuationContents?.musicRadioContinuation != null -> {
+            val radio = response.continuationContents.musicRadioContinuation
+            PlaylistContinuationPage(
+                songs = radio.contents.getItems().mapNotNull {
+                    PlaylistPage.fromMusicResponsiveListItemRenderer(it)
+                },
+                continuation = radio.continuations?.getContinuation()
+            )
+        }
+        // Handle charts or other types
+        else -> {
             val continuationItems = response.onResponseReceivedActions?.firstOrNull()
                 ?.appendContinuationItemsAction?.continuationItems
             PlaylistContinuationPage(
@@ -388,6 +402,7 @@ object YouTube {
             )
         }
     }
+}
 
     suspend fun home(): Result<HomePage> = runCatching {
         var response = innerTube.browse(WEB_REMIX, browseId = "FEmusic_home").body<BrowseResponse>()
