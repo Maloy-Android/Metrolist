@@ -369,36 +369,43 @@ object YouTube {
         setLogin = true
     ).body<BrowseResponse>()
 
-    
-    response.continuationContents?.musicPlaylistShelfContinuation?.let { shelf ->
-        return@runCatching PlaylistContinuationPage(
-            songs = shelf.contents.getItems().mapNotNull {
-                PlaylistPage.fromMusicResponsiveListItemRenderer(it)
-            },
-            continuation = shelf.continuations?.getContinuation()
-        )
+    when {
+        response.continuationContents?.musicPlaylistShelfContinuation != null -> {
+            val shelf = response.continuationContents.musicPlaylistShelfContinuation
+            PlaylistContinuationPage(
+                songs = shelf.contents?.getItems()?.mapNotNull {
+                    PlaylistPage.fromMusicResponsiveListItemRenderer(it)
+                } ?: emptyList(),
+                continuation = shelf.continuations?.getContinuation()
+            )
+        }
+        
+        response.continuationContents?.musicShelfContinuation != null -> {
+            val shelf = response.continuationContents.musicShelfContinuation
+            PlaylistContinuationPage(
+                songs = shelf.contents?.mapNotNull { content ->
+                    content.musicResponsiveListItemRenderer?.let {
+                        PlaylistPage.fromMusicResponsiveListItemRenderer(it)
+                    }
+                } ?: emptyList(),
+                continuation = shelf.continuations?.getContinuation()
+            )
+        }
+        
+        else -> {
+            val continuationItems = response.onResponseReceivedActions?.firstOrNull()
+                ?.appendContinuationItemsAction?.continuationItems
+            
+            PlaylistContinuationPage(
+                songs = continuationItems?.mapNotNull { item ->
+                    item.musicResponsiveListItemRenderer?.let {
+                        PlaylistPage.fromMusicResponsiveListItemRenderer(it)
+                    }
+                } ?: emptyList(),
+                continuation = continuationItems?.getContinuation()
+            )
+        }
     }
-
-
-    response.continuationContents?.musicShelfContinuation?.let { shelf ->
-        return@runCatching PlaylistContinuationPage(
-            songs = shelf.contents.getItems().mapNotNull {
-                PlaylistPage.fromMusicResponsiveListItemRenderer(it)
-            },
-            continuation = shelf.continuations?.getContinuation()
-        )
-    }
-
-    
-    val continuationItems = response.onResponseReceivedActions?.firstOrNull()
-        ?.appendContinuationItemsAction?.continuationItems
-
-    PlaylistContinuationPage(
-        songs = continuationItems?.getItems()?.mapNotNull {
-            PlaylistPage.fromMusicResponsiveListItemRenderer(it)
-        } ?: emptyList(),
-        continuation = continuationItems?.getContinuation()
-    )
 }
     
     suspend fun home(): Result<HomePage> = runCatching {
