@@ -370,16 +370,20 @@ object YouTube {
     ).body<BrowseResponse>()
 
     when {
+        // حالة البلايليست العادية
         response.continuationContents?.musicPlaylistShelfContinuation != null -> {
             val shelf = response.continuationContents.musicPlaylistShelfContinuation
             PlaylistContinuationPage(
-                songs = shelf.contents?.getItems()?.mapNotNull {
-                    PlaylistPage.fromMusicResponsiveListItemRenderer(it)
+                songs = shelf.contents?.mapNotNull { content ->
+                    content.musicResponsiveListItemRenderer?.let {
+                        PlaylistPage.fromMusicResponsiveListItemRenderer(it)
+                    }
                 } ?: emptyList(),
                 continuation = shelf.continuations?.getContinuation()
             )
         }
-        
+
+        // حالة الرفوف الموسيقية (قد تشمل الراديو والشارتات)
         response.continuationContents?.musicShelfContinuation != null -> {
             val shelf = response.continuationContents.musicShelfContinuation
             PlaylistContinuationPage(
@@ -391,7 +395,8 @@ object YouTube {
                 continuation = shelf.continuations?.getContinuation()
             )
         }
-        
+
+        // حالة الاستمرارية العامة
         else -> {
             val continuationItems = response.onResponseReceivedActions?.firstOrNull()
                 ?.appendContinuationItemsAction?.continuationItems
