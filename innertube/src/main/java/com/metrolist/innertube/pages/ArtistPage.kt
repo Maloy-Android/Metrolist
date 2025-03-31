@@ -28,6 +28,19 @@ data class ArtistPage(
     val sections: List<ArtistSection>,
     val description: String?,
 ) {
+    fun filterExplicit(enabled: Boolean) =
+        if (enabled) {
+            copy(sections = sections.mapNotNull {
+                it.copy(
+                    items = it.items
+                        .filterExplicit()
+                        .ifEmpty {
+                            return@mapNotNull null
+                        }
+                )
+            })
+        } else this
+
     companion object {
         fun fromSectionListRendererContent(content: SectionListRenderer.Content): ArtistSection? {
             return when {
@@ -94,22 +107,30 @@ data class ArtistPage(
         private fun fromMusicTwoRowItemRenderer(renderer: MusicTwoRowItemRenderer): YTItem? {
             return when {
                 renderer.isSong -> {
-                    SongItem(
-                        id = renderer.navigationEndpoint.watchEndpoint?.videoId ?: return null,
-                        title = renderer.title.runs?.firstOrNull()?.text ?: return null,
-                        artists = listOfNotNull(renderer.subtitle?.runs?.firstOrNull()?.let {
+                    renderer.subtitle?.runs
+                        ?.filter {
+                            it.navigationEndpoint?.browseEndpoint?.browseId != null
+                        }
+                        ?.map {
                             Artist(
                                 name = it.text,
                                 id = it.navigationEndpoint?.browseEndpoint?.browseId
                             )
-                        }),
-                        album = null,
-                        duration = null,
-                        thumbnail = renderer.thumbnailRenderer.musicThumbnailRenderer?.getThumbnailUrl() ?: return null,
-                        explicit = renderer.subtitleBadges?.find {
-                            it.musicInlineBadgeRenderer?.icon?.iconType == "MUSIC_EXPLICIT_BADGE"
-                        } != null
-                    )
+                        }
+                        ?.takeIf { it.isNotEmpty() }
+                        ?.let {
+                            SongItem(
+                                id = renderer.navigationEndpoint.watchEndpoint?.videoId ?: return null,
+                                title = renderer.title.runs?.firstOrNull()?.text ?: return null,
+                                artists = it,
+                                album = null,
+                                duration = null,
+                                thumbnail = renderer.thumbnailRenderer.musicThumbnailRenderer?.getThumbnailUrl() ?: return null,
+                                explicit = renderer.subtitleBadges?.any {
+                                    it.musicInlineBadgeRenderer?.icon?.iconType == "MUSIC_EXPLICIT_BADGE"
+                                } == true
+                            )
+                        }
                 }
 
                 renderer.isAlbum -> {
@@ -145,7 +166,7 @@ data class ArtistPage(
                         shuffleEndpoint = renderer.menu?.menuRenderer?.items?.find {
                             it.menuNavigationItemRenderer?.icon?.iconType == "MUSIC_SHUFFLE"
                         }?.menuNavigationItemRenderer?.navigationEndpoint?.watchPlaylistEndpoint ?: return null,
-                        radioEndpoint = renderer.menu?.menuRenderer?.items?.find {
+                        radioEndpoint = renderer.menu.menuRenderer.items.find {
                             it.menuNavigationItemRenderer?.icon?.iconType == "MIX"
                         }?.menuNavigationItemRenderer?.navigationEndpoint?.watchPlaylistEndpoint ?: return null
                     )
@@ -154,14 +175,17 @@ data class ArtistPage(
                 renderer.isArtist -> {
                     ArtistItem(
                         id = renderer.navigationEndpoint.browseEndpoint?.browseId ?: return null,
+                        channelId = renderer.menu?.menuRenderer?.items?.find {
+                            it.toggleMenuServiceItemRenderer?.defaultIcon?.iconType == "SUBSCRIBE"
+                        }?.toggleMenuServiceItemRenderer?.defaultServiceEndpoint?.subscribeEndpoint?.channelIds?.firstOrNull(),
                         title = renderer.title.runs?.lastOrNull()?.text ?: return null,
                         thumbnail = renderer.thumbnailRenderer.musicThumbnailRenderer?.getThumbnailUrl() ?: return null,
                         shuffleEndpoint = renderer.menu?.menuRenderer?.items?.find {
                             it.menuNavigationItemRenderer?.icon?.iconType == "MUSIC_SHUFFLE"
                         }?.menuNavigationItemRenderer?.navigationEndpoint?.watchPlaylistEndpoint ?: return null,
-                        radioEndpoint = renderer.menu?.menuRenderer?.items?.find {
+                        radioEndpoint = renderer.menu.menuRenderer.items.find {
                             it.menuNavigationItemRenderer?.icon?.iconType == "MIX"
-                        }?.menuNavigationItemRenderer?.navigationEndpoint?.watchPlaylistEndpoint ?: return null
+                        }?.menuNavigationItemRenderer?.navigationEndpoint?.watchPlaylistEndpoint ?: return null,
                     )
                 }
 
