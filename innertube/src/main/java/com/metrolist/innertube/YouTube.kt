@@ -363,44 +363,44 @@ object YouTube {
     }
 
     suspend fun playlistContinuation(continuation: String) = runCatching {
-       val response = innerTube.browse(
-           client = WEB_REMIX,
-           continuation = continuation,
-           setLogin = true
-       ).body<BrowseResponse>()
+    val response = innerTube.browse(
+        client = WEB_REMIX,
+        continuation = continuation,
+        setLogin = true
+    ).body<BrowseResponse>()
 
-       when {
-           response.continuationContents?.musicPlaylistShelfContinuation != null -> {
-               val shelf = response.continuationContents.musicPlaylistShelfContinuation
-               PlaylistContinuationPage(
-                   songs = shelf.contents.getItems().mapNotNull {
-                       PlaylistPage.fromMusicResponsiveListItemRenderer(it)
-                   },
-                   continuation = shelf.continuations?.getContinuation()
-               )
-           }
-           // إضافة تحقق بديل للراديو (مثال: قد يكون الاسم radioContinuation)
-           response.continuationContents?.radioContinuation != null -> {
-               val radio = response.continuationContents.radioContinuation
-               PlaylistContinuationPage(
-                   songs = radio.contents.getItems().mapNotNull {
-                       PlaylistPage.fromMusicResponsiveListItemRenderer(it)
-                   },
-                   continuation = radio.continuations?.getContinuation()
-               )
-           }
-           else -> {
-               val continuationItems = response.onResponseReceivedActions?.firstOrNull()
-                   ?.appendContinuationItemsAction?.continuationItems
-               PlaylistContinuationPage(
-                   songs = continuationItems?.getItems()?.mapNotNull {
-                       PlaylistPage.fromMusicResponsiveListItemRenderer(it)
-                   } ?: emptyList(),
-                   continuation = continuationItems?.getContinuation()
-               )
-           }
-       }
-   }
+    
+    response.continuationContents?.musicPlaylistShelfContinuation?.let { shelf ->
+        return@runCatching PlaylistContinuationPage(
+            songs = shelf.contents.getItems().mapNotNull {
+                PlaylistPage.fromMusicResponsiveListItemRenderer(it)
+            },
+            continuation = shelf.continuations?.getContinuation()
+        )
+    }
+
+
+    response.continuationContents?.musicShelfContinuation?.let { shelf ->
+        return@runCatching PlaylistContinuationPage(
+            songs = shelf.contents.getItems().mapNotNull {
+                PlaylistPage.fromMusicResponsiveListItemRenderer(it)
+            },
+            continuation = shelf.continuations?.getContinuation()
+        )
+    }
+
+    
+    val continuationItems = response.onResponseReceivedActions?.firstOrNull()
+        ?.appendContinuationItemsAction?.continuationItems
+
+    PlaylistContinuationPage(
+        songs = continuationItems?.getItems()?.mapNotNull {
+            PlaylistPage.fromMusicResponsiveListItemRenderer(it)
+        } ?: emptyList(),
+        continuation = continuationItems?.getContinuation()
+    )
+}
+    
     suspend fun home(): Result<HomePage> = runCatching {
         var response = innerTube.browse(WEB_REMIX, browseId = "FEmusic_home").body<BrowseResponse>()
         var continuation = response.contents?.singleColumnBrowseResultsRenderer?.tabs?.firstOrNull()
